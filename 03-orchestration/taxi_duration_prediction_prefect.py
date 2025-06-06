@@ -1,9 +1,12 @@
+import mlflow
 from prefect import task, flow
 from sklearn.feature_extraction import DictVectorizer
 from sklearn.linear_model import LinearRegression
 from sklearn.metrics import root_mean_squared_error
 import numpy as np
 import pandas as pd
+
+mlflow.set_tracking_uri("http://127.0.0.1:5001")
 
 @task
 def read_dataframe(filename):
@@ -22,6 +25,7 @@ def read_dataframe(filename):
 
 @task
 def preprocess_data(df):
+    print(df.head())
     df = df[["PULocationID", "DOLocationID", "duration"]]
     df[["PULocationID", "DOLocationID"]] = df[["PULocationID", "DOLocationID"]].astype(str)
     return df
@@ -40,10 +44,15 @@ def transform_data(data_dict, vectorizer):
     return feature_mat
 
 
-@task
+@task(log_prints=True)
 def train_model(X_train, y_train):
-    model = LinearRegression()
-    model.fit(X_train, y_train)
+    with mlflow.start_run():
+        model = LinearRegression()
+        model.fit(X_train, y_train)
+        #print(f"model intercept: {model.intercept_}")
+        mlflow.log_param("model_intercept", model.intercept_)
+        #mlflow.log_metric("metric_name", metric_value)
+        mlflow.sklearn.log_model(model, "LR_model")
     return model
 
 
