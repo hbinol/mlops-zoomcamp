@@ -184,3 +184,55 @@ def measure_length_width_with_axes(mask, image, pixels_per_cm, debug=False):
         plt.show()
 
     return results
+
+
+
+    def compute_scale_with_unit(gray, image, debug=False):
+    """
+    Compute pixel-per-cm scale and auto-detect if OCR picked inch instead.
+    Returns: (scale_pixels_per_cm, is_inch)
+    """
+    data = pytesseract.image_to_data(gray, config='--psm 6 digits', output_type=pytesseract.Output.DICT)
+    positions = {}
+
+    for i, txt in enumerate(data['text']):
+        if txt.isdigit():
+            val = int(txt)
+            if 0 <= val <= 30:
+                x = data['left'][i] + data['width'][i] // 2
+                y = data['top'][i] + data['height'][i] // 2
+                positions[val] = (x, y)
+
+    for a, b in [(0, 10), (0, 5), (0, 1), (1, 2), (2, 3)]:
+        if a in positions and b in positions:
+            dist_px = np.linalg.norm(np.array(positions[a]) - np.array(positions[b]))
+            delta = abs(b - a)
+
+            pixels_per_unit = dist_px / delta
+
+            # Heuristic: determine if unit is inch
+            if 80 <= pixels_per_unit <= 120:
+                print(f"Detected likely inch scale: {pixels_per_unit:.2f} px/inch → converting to cm")
+                return pixels_per_unit / 2.54, True  # convert to pixels/cm
+            else:
+                print(f"Detected cm scale: {pixels_per_unit:.2f} px/cm")
+                return pixels_per_unit, False
+
+    # Fallback: tick spacing
+    print("OCR failed — using fallback tick spacing")
+    spacing = fallback_tick_spacing(gray)
+
+    if 80 <= spacing <= 120:
+        print(f"Detected inch tick spacing: {spacing:.2f} → converted to cm")
+        return spacing / 2.54, True
+    else:
+        print(f"Detected cm tick spacing: {spacing:.2f}")
+        return spacing, False
+
+
+gray = preprocess_for_ocr(image, ruler_mask)
+pixels_per_cm, is_inch = compute_scale_with_unit(gray, image)
+
+print(f"Final scale: {pixels_per_cm:.2f} pixels per cm")
+if is_inch:
+    print("Note: Original OCR was inch-based. Converted to cm.")
