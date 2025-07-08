@@ -236,3 +236,40 @@ pixels_per_cm, is_inch = compute_scale_with_unit(gray, image)
 print(f"Final scale: {pixels_per_cm:.2f} pixels per cm")
 if is_inch:
     print("Note: Original OCR was inch-based. Converted to cm.")
+
+
+import cv2
+
+# Step 1: Load image
+image_path = "grape_with_ruler.jpg"
+image = cv2.imread(image_path)
+
+# Step 2: Load SAM and generate masks
+predictor = load_sam()
+predictor.set_image(image)
+h, w = image.shape[:2]
+masks, _, _ = predictor.predict(
+    point_coords=np.array([[w // 2, h // 2]]),
+    point_labels=np.array([1]),
+    multimask_output=True
+)
+
+# Step 3: Find the ruler mask
+ruler_mask = find_ruler_mask(image, masks)
+
+# Step 4: Preprocess and compute pixels-per-cm
+gray = preprocess_for_ocr(image, ruler_mask)
+pixels_per_cm, is_inch = compute_scale_with_unit(gray, image)
+
+print(f"📏 Scale: {pixels_per_cm:.2f} pixels/cm {'(converted from inch)' if is_inch else ''}")
+
+# Step 5: Detect yellow grapes
+yellow_mask = detect_yellow_objects(image, debug=True)
+
+# Step 6: Measure and visualize length × width per grape
+results = measure_length_width_with_axes(yellow_mask, image, pixels_per_cm, debug=True)
+
+# Step 7: Print measurement summary
+print("\n📐 Detected Grape Dimensions (Length × Width in cm):")
+for i, (length_cm, width_cm) in enumerate(results):
+    print(f"Grape {i+1}: {length_cm:.2f} × {width_cm:.2f} cm")
