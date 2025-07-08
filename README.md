@@ -61,3 +61,57 @@ def measure_yellow_grapes(image, pixels_per_cm, debug=False):
 
     print(f"Detected {len(sizes_cm2)} yellow grapes.")
     return sizes_cm2
+
+
+def measure_length_width(mask, image, pixels_per_cm, debug=False):
+    """
+    For each object in the mask, measures length and width using minAreaRect.
+    Draws annotated results on the image.
+    Returns list of (length_cm, width_cm).
+    """
+    results = []
+    out_image = image.copy()
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    for cnt in contours:
+        if cv2.contourArea(cnt) < 50:
+            continue  # ignore noise
+
+        rect = cv2.minAreaRect(cnt)  # (center, (width, height), angle)
+        (cx, cy), (w, h), angle = rect
+
+        length_px = max(w, h)
+        width_px = min(w, h)
+
+        length_cm = length_px / pixels_per_cm
+        width_cm = width_px / pixels_per_cm
+        results.append((length_cm, width_cm))
+
+        box = cv2.boxPoints(rect)
+        box = np.intp(box)
+
+        # Draw box and annotate
+        cv2.drawContours(out_image, [box], 0, (0, 255, 0), 2)
+        cv2.putText(out_image, f"{length_cm:.1f}x{width_cm:.1f}cm", 
+                    (int(cx), int(cy)), 
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+
+    if debug:
+        plt.figure(figsize=(10, 10))
+        plt.imshow(cv2.cvtColor(out_image, cv2.COLOR_BGR2RGB))
+        plt.title("Detected Length × Width per Yellow Object")
+        plt.axis('off')
+        plt.show()
+
+    return results
+
+image = cv2.imread("grape_with_ruler.jpg")
+pixels_per_cm = 38.7  # obtained from OCR or fallback
+
+yellow_mask = detect_yellow_objects(image, debug=True)
+
+measurements = measure_length_width(yellow_mask, image, pixels_per_cm, debug=True)
+
+print("Sample object measurements (length x width in cm):")
+for lw in measurements[:5]:
+    print(f"{lw[0]:.2f} x {lw[1]:.2f}")
