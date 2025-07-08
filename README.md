@@ -237,7 +237,7 @@ print(f"Final scale: {pixels_per_cm:.2f} pixels per cm")
 if is_inch:
     print("Note: Original OCR was inch-based. Converted to cm.")
 
-
+~~~
 import cv2
 
 # Step 1: Load image
@@ -273,3 +273,4 @@ results = measure_length_width_with_axes(yellow_mask, image, pixels_per_cm, debu
 print("\n📐 Detected Grape Dimensions (Length × Width in cm):")
 for i, (length_cm, width_cm) in enumerate(results):
     print(f"Grape {i+1}: {length_cm:.2f} × {width_cm:.2f} cm")
+~~~
