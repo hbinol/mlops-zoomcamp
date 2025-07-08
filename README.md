@@ -115,3 +115,72 @@ measurements = measure_length_width(yellow_mask, image, pixels_per_cm, debug=Tru
 print("Sample object measurements (length x width in cm):")
 for lw in measurements[:5]:
     print(f"{lw[0]:.2f} x {lw[1]:.2f}")
+
+def measure_length_width_with_axes(mask, image, pixels_per_cm, debug=False):
+    """
+    Measures length & width of yellow objects and visualizes:
+    - Green rotated bounding box
+    - Major/minor axes as lines
+    - Text label with dimensions
+    """
+    results = []
+    out_img = image.copy()
+    contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+    for cnt in contours:
+        if cv2.contourArea(cnt) < 50:
+            continue
+
+        rect = cv2.minAreaRect(cnt)
+        (cx, cy), (w, h), angle = rect
+        box = cv2.boxPoints(rect)
+        box = np.intp(box)
+
+        # Determine major/minor
+        if w >= h:
+            major_px = w
+            minor_px = h
+            major_angle = angle
+        else:
+            major_px = h
+            minor_px = w
+            major_angle = angle + 90
+
+        major_cm = major_px / pixels_per_cm
+        minor_cm = minor_px / pixels_per_cm
+        results.append((major_cm, minor_cm))
+
+        # Draw rotated bounding box
+        cv2.drawContours(out_img, [box], 0, (0, 255, 0), 2)
+
+        # Draw major and minor axes
+        center = (int(cx), int(cy))
+        major_rad = np.deg2rad(major_angle)
+        dx_major = int((major_px / 2) * np.cos(major_rad))
+        dy_major = int((major_px / 2) * np.sin(major_rad))
+
+        dx_minor = int((minor_px / 2) * np.cos(major_rad + np.pi / 2))
+        dy_minor = int((minor_px / 2) * np.sin(major_rad + np.pi / 2))
+
+        pt1_major = (center[0] - dx_major, center[1] - dy_major)
+        pt2_major = (center[0] + dx_major, center[1] + dy_major)
+        pt1_minor = (center[0] - dx_minor, center[1] - dy_minor)
+        pt2_minor = (center[0] + dx_minor, center[1] + dy_minor)
+
+        cv2.line(out_img, pt1_major, pt2_major, (255, 0, 0), 2)  # Major axis = blue
+        cv2.line(out_img, pt1_minor, pt2_minor, (0, 0, 255), 2)  # Minor axis = red
+
+        # Annotate length × width
+        text = f"{major_cm:.1f} × {minor_cm:.1f} cm"
+        text_pos = (center[0] + 5, center[1] - 5)
+        cv2.putText(out_img, text, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0,0,0), 2)
+        cv2.putText(out_img, text, text_pos, cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255,255,255), 1)
+
+    if debug:
+        plt.figure(figsize=(12, 12))
+        plt.imshow(cv2.cvtColor(out_img, cv2.COLOR_BGR2RGB))
+        plt.title("Yellow Object Dimensions with Axes")
+        plt.axis('off')
+        plt.show()
+
+    return results
