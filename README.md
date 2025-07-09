@@ -274,3 +274,36 @@ print("\n📐 Detected Grape Dimensions (Length × Width in cm):")
 for i, (length_cm, width_cm) in enumerate(results):
     print(f"Grape {i+1}: {length_cm:.2f} × {width_cm:.2f} cm")
 ~~~
+
+~~~
+def find_ruler_mask_by_text(image, masks, debug=False):
+    """
+    Iterate through SAM masks and find the one most likely to be the ruler,
+    based on presence of digits (0–30) in OCR.
+    """
+    best_score = 0
+    best_mask = None
+
+    for idx, mask in enumerate(masks):
+        masked = cv2.bitwise_and(image, image, mask=mask.astype(np.uint8))
+        gray = preprocess_for_ocr(masked)
+
+        # Run OCR
+        data = pytesseract.image_to_data(gray, config='--psm 6 digits', output_type=pytesseract.Output.DICT)
+        count_digits = sum(1 for t in data['text'] if t.strip().isdigit())
+
+        if count_digits > best_score:
+            best_score = count_digits
+            best_mask = mask
+
+        if debug:
+            print(f"Mask {idx}: Detected {count_digits} numeric labels")
+
+    if best_mask is not None and debug:
+        plt.imshow(best_mask, cmap='gray')
+        plt.title("Selected Ruler Mask")
+        plt.axis('off')
+        plt.show()
+
+    return best_mask
+~~~
